@@ -1,0 +1,13 @@
+# *
+User-agent: *
+Allow: /
+
+# *
+User-agent: *
+Disallow: /private/
+
+# Host
+Host: https://clocky.ludgi.ai
+
+# Sitemaps
+Sitemap: https://clocky.ludgi.ai/sitemap.xml
