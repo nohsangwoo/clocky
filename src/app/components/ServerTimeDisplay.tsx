@@ -103,7 +103,7 @@ export default function ServerTimeDisplay() {
             const results = await Promise.all(urls.map(url => fetchServerTime(url)));
             return Object.assign({}, ...results);
         },
-        refetchInterval: 60000,
+        refetchInterval: 20000,
         enabled: urls.length > 0,
     });
 
