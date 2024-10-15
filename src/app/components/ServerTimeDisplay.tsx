@@ -1,6 +1,6 @@
 'use client';
 
-import { fetchServerTime } from '@/libs/fetchServerTime';
+import { fetchServerTime, normalizeUrl } from '@/libs/fetchServerTime';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -36,8 +36,8 @@ function TimeUnit({ value, label }: { value: string; label: string }) {
                 key={value}
                 initial={isMilliseconds ? { opacity: 0 } : { y: 20, opacity: 0 }}
                 animate={isMilliseconds ? { opacity: 1 } : { y: 0, opacity: 1 }}
-                transition={isMilliseconds 
-                    ? { duration: 0.1 } 
+                transition={isMilliseconds
+                    ? { duration: 0.1 }
                     : { type: 'spring', stiffness: 300, damping: 30 }
                 }
             >
@@ -109,9 +109,16 @@ export default function ServerTimeDisplay() {
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (url && !urls.includes(url)) {
-            setUrls([...urls, url]);
-            setUrl('');
+        if (url) {
+            try {
+                const normalizedUrl = normalizeUrl(url);
+                if (!urls.includes(normalizedUrl)) {
+                    setUrls([...urls, normalizedUrl]);
+                    setUrl('');
+                }
+            } catch (error) {
+                alert('유효하지 않은 URL입니다. 다시 확인해 주세요.');
+            }
         }
     };
 
