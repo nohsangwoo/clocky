@@ -2,7 +2,7 @@
 
 import { fetchServerTime, normalizeUrl } from '@/libs/fetchServerTime';
 import { useQuery } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function formatTime(isoString: string) {
     const date = new Date(isoString);
@@ -24,29 +24,140 @@ function TimeUnit({ value, label }: { value: string; label: string }) {
 
 function ServerTime({ url, initialTime }: { url: string; initialTime: string }) {
     const [time, setTime] = useState(formatTime(initialTime));
+    const [date, setDate] = useState(new Date(initialTime));
+    const [notificationSettings, setNotificationSettings] = useState({
+        isEnabled: false,
+        times: [] as number[]
+    });
+    const [audioPermission, setAudioPermission] = useState<boolean>(false);
+    const audioContextRef = useRef<AudioContext | null>(null);
 
     useEffect(() => {
         const timer = setInterval(() => {
             setTime(prevTime => {
-                const newDate = new Date();
-                newDate.setHours(parseInt(prevTime.hours));
-                newDate.setMinutes(parseInt(prevTime.minutes));
-                newDate.setSeconds(parseInt(prevTime.seconds) + 1);
+                const newDate = new Date(date);
+                newDate.setSeconds(newDate.getSeconds() + 1);
+                setDate(newDate);
                 return formatTime(newDate.toISOString());
             });
         }, 1000);
 
         return () => clearInterval(timer);
-    }, []);
+    }, [date]);
+
+    const initAudioContext = () => {
+        if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+            setAudioPermission(true);
+        }
+    };
+
+    const handleNotificationChange = () => {
+        if (!notificationSettings.isEnabled) {
+            if (window.confirm("알림 및 소리 재생을 허용하시겠습니까?")) {
+                try {
+                    initAudioContext();
+                    setNotificationSettings(prev => ({ ...prev, isEnabled: true }));
+                } catch (error) {
+                    console.error('오디오 컨텍스트 초기화 중 오류 발생:', error);
+                    alert('알림 소리를 설정하는 중 오류가 발생했습니다.');
+                }
+            }
+        } else {
+            setNotificationSettings(prev => ({ ...prev, isEnabled: false, times: [] }));
+        }
+    };
+
+    const toggleNotificationTime = (minutes: number) => {
+        setNotificationSettings(prev => {
+            const newTimes = prev.times.includes(minutes)
+                ? prev.times.filter(t => t !== minutes)
+                : [...prev.times, minutes];
+            return { ...prev, times: newTimes };
+        });
+    };
+
+    const playNotificationSound = () => {
+        if (!audioContextRef.current) return;
+
+        const oscillator = audioContextRef.current.createOscillator();
+        const gainNode = audioContextRef.current.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime);
+        gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+        gainNode.gain.linearRampToValueAtTime(1, audioContextRef.current.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 0.5);
+
+        oscillator.start(audioContextRef.current.currentTime);
+        oscillator.stop(audioContextRef.current.currentTime + 0.5);
+    };
+
+    const sendNotification = (minutes: number) => {
+        if (notificationSettings.isEnabled && audioPermission) {
+            const notification = new Notification(`${url} 서버 시간 알림`, {
+                body: `${minutes}분 전입니다: ${time.hours}:${time.minutes}:${time.seconds}`,
+            });
+
+            playNotificationSound();
+        }
+    };
+
+    useEffect(() => {
+        if (notificationSettings.isEnabled && notificationSettings.times.length > 0) {
+            const notificationTimer = setInterval(() => {
+                const currentMinutes = date.getMinutes();
+                const currentSeconds = date.getSeconds();
+
+                notificationSettings.times.forEach(minutes => {
+                    if (currentMinutes === (60 - minutes) && currentSeconds === 0) {
+                        sendNotification(minutes);
+                    }
+                });
+            }, 1000);
+
+            return () => clearInterval(notificationTimer);
+        }
+    }, [notificationSettings, date]);
 
     return (
         <div className="mb-8 p-4 bg-gray-800 rounded-xl shadow-xl">
             <h3 className="text-lg font-semibold mb-2 text-gray-200">{url}</h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="text-2xl font-bold text-white mb-4">
+                {date.getFullYear()}년 {date.getMonth() + 1}월 {date.getDate()}일
+            </div>
+            <div className="grid grid-cols-3 gap-2 mb-4">
                 <TimeUnit value={time.hours} label="시" />
                 <TimeUnit value={time.minutes} label="분" />
                 <TimeUnit value={time.seconds} label="초" />
             </div>
+            <div className="flex items-center mb-2">
+                <input
+                    type="checkbox"
+                    id={`notification-${url}`}
+                    checked={notificationSettings.isEnabled}
+                    onChange={handleNotificationChange}
+                    className="mr-2"
+                />
+                <label htmlFor={`notification-${url}`} className="text-white">알림 듣기</label>
+            </div>
+            {notificationSettings.isEnabled && (
+                <div className="flex space-x-2">
+                    {[1, 2, 3].map((minutes) => (
+                        <button
+                            key={minutes}
+                            onClick={() => toggleNotificationTime(minutes)}
+                            className={`px-2 py-1 rounded ${notificationSettings.times.includes(minutes) ? 'bg-purple-600' : 'bg-gray-600'
+                                } text-white`}
+                        >
+                            {minutes}분 전
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
