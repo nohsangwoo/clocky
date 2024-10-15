@@ -106,6 +106,25 @@ function ServerTime({ url, initialTime }: { url: string; initialTime: string }) 
         }
     };
 
+    const playTestSound = () => {
+        if (!audioContextRef.current) return;
+
+        const oscillator = audioContextRef.current.createOscillator();
+        const gainNode = audioContextRef.current.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContextRef.current.destination);
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime);
+        gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
+        gainNode.gain.linearRampToValueAtTime(1, audioContextRef.current.currentTime + 0.01);
+        gainNode.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 2);
+
+        oscillator.start(audioContextRef.current.currentTime);
+        oscillator.stop(audioContextRef.current.currentTime + 2);
+    };
+
     useEffect(() => {
         if (notificationSettings.isEnabled && notificationSettings.times.length > 0) {
             const notificationTimer = setInterval(() => {
@@ -143,6 +162,14 @@ function ServerTime({ url, initialTime }: { url: string; initialTime: string }) 
                     className="mr-2"
                 />
                 <label htmlFor={`notification-${url}`} className="text-white">알림 듣기</label>
+                {notificationSettings.isEnabled && (
+                    <button
+                        onClick={playTestSound}
+                        className="ml-4 px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 transition duration-300"
+                    >
+                        알림 테스트
+                    </button>
+                )}
             </div>
             {notificationSettings.isEnabled && (
                 <div className="flex space-x-2">
