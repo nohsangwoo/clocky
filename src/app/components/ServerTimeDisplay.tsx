@@ -3,48 +3,22 @@
 import { fetchServerTime, normalizeUrl } from '@/libs/fetchServerTime';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 
 function formatTime(isoString: string) {
     const date = new Date(isoString);
     return {
-        date: {
-            year: date.getFullYear(),
-            month: String(date.getMonth() + 1).padStart(2, '0'),
-            day: String(date.getDate()).padStart(2, '0'),
-        },
-        time: {
-            hours: String(date.getHours()).padStart(2, '0'),
-            minutes: String(date.getMinutes()).padStart(2, '0'),
-            seconds: String(date.getSeconds()).padStart(2, '0'),
-            milliseconds: String(date.getMilliseconds()).padStart(3, '0'),
-        }
+        hours: String(date.getHours()).padStart(2, '0'),
+        minutes: String(date.getMinutes()).padStart(2, '0'),
+        seconds: String(date.getSeconds()).padStart(2, '0'),
     };
 }
 
 function TimeUnit({ value, label }: { value: string; label: string }) {
-    const isMilliseconds = label === "밀리초";
     return (
-        <motion.div
-            className="flex flex-col items-center p-2 bg-gradient-to-r from-purple-700 to-pink-700 rounded-lg shadow-lg"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-        >
-            <motion.span
-                className="text-2xl font-bold text-white"
-                key={value}
-                initial={isMilliseconds ? { opacity: 0 } : { y: 20, opacity: 0 }}
-                animate={isMilliseconds ? { opacity: 1 } : { y: 0, opacity: 1 }}
-                transition={isMilliseconds
-                    ? { duration: 0.1 }
-                    : { type: 'spring', stiffness: 300, damping: 30 }
-                }
-            >
-                {value}
-            </motion.span>
+        <div className="flex flex-col items-center p-2 bg-gradient-to-r from-purple-700 to-pink-700 rounded-lg shadow-lg">
+            <span className="text-2xl font-bold text-white">{value}</span>
             <span className="text-xs text-white opacity-80">{label}</span>
-        </motion.div>
+        </div>
     );
 }
 
@@ -54,42 +28,26 @@ function ServerTime({ url, initialTime }: { url: string; initialTime: string }) 
     useEffect(() => {
         const timer = setInterval(() => {
             setTime(prevTime => {
-                const newDate = new Date(
-                    prevTime.date.year,
-                    parseInt(prevTime.date.month) - 1,
-                    parseInt(prevTime.date.day),
-                    parseInt(prevTime.time.hours),
-                    parseInt(prevTime.time.minutes),
-                    parseInt(prevTime.time.seconds),
-                    parseInt(prevTime.time.milliseconds) + 10
-                );
+                const newDate = new Date();
+                newDate.setHours(parseInt(prevTime.hours));
+                newDate.setMinutes(parseInt(prevTime.minutes));
+                newDate.setSeconds(parseInt(prevTime.seconds) + 1);
                 return formatTime(newDate.toISOString());
             });
-        }, 10);
+        }, 1000);
 
         return () => clearInterval(timer);
     }, []);
 
     return (
-        <motion.div
-            className="mb-8 p-4 bg-gray-800 rounded-xl shadow-xl"
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-        >
+        <div className="mb-8 p-4 bg-gray-800 rounded-xl shadow-xl">
             <h3 className="text-lg font-semibold mb-2 text-gray-200">{url}</h3>
-            <div className="grid grid-cols-3 gap-2 mb-2">
-                <TimeUnit value={time.date.year.toString()} label="년" />
-                <TimeUnit value={time.date.month} label="월" />
-                <TimeUnit value={time.date.day} label="일" />
+            <div className="grid grid-cols-3 gap-2">
+                <TimeUnit value={time.hours} label="시" />
+                <TimeUnit value={time.minutes} label="분" />
+                <TimeUnit value={time.seconds} label="초" />
             </div>
-            <div className="grid grid-cols-4 gap-2">
-                <TimeUnit value={time.time.hours} label="시" />
-                <TimeUnit value={time.time.minutes} label="분" />
-                <TimeUnit value={time.time.seconds} label="초" />
-                <TimeUnit value={time.time.milliseconds} label="밀리초" />
-            </div>
-        </motion.div>
+        </div>
     );
 }
 
