@@ -6,11 +6,6 @@ export function normalizeUrl(input: string): string {
     url = 'https://' + url
   }
 
-  // www. 접두사가 없는 경우 추가
-  if (!url.includes('://www.') && url.includes('://')) {
-    url = url.replace('://', '://www.')
-  }
-
   // URL 끝에 슬래시가 없는 경우 추가
   if (!url.endsWith('/')) {
     url += '/'
@@ -33,14 +28,21 @@ export async function fetchServerTime(
       ? 'https://clocky.ludgi.ai'
       : 'http://localhost:3000'
 
-  const normalizedUrl = normalizeUrl(url)
+  //   const normalizedUrl = normalizeUrl(url)
   const clientRequestTime = new Date().toISOString()
 
+  console.log('url', url)
+
   const response = await fetch(
-    `${basicUrl}/servertime?url=${encodeURIComponent(
-      normalizedUrl,
-    )}&clientTime=${encodeURIComponent(clientRequestTime)}`,
+    `${basicUrl}/servertime?url=${url}&clientTime=${encodeURIComponent(
+      clientRequestTime,
+    )}`,
   )
+  //   const response = await fetch(
+  //     `${basicUrl}/servertime?url=${encodeURIComponent(
+  //         url,
+  //     )}&clientTime=${encodeURIComponent(clientRequestTime)}`,
+  //   )
   if (!response.ok) {
     throw new Error('서버 시간 조회 실패')
   }

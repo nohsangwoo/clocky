@@ -3,6 +3,8 @@
 import { fetchServerTime, normalizeUrl } from '@/libs/fetchServerTime';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
+import DisplayLudgi from './DisplayLudgi';
+import { motion } from 'framer-motion';
 
 function formatTime(isoString: string) {
     const date = new Date(isoString);
@@ -31,19 +33,49 @@ function ServerTime({ url, initialTime }: { url: string; initialTime: string }) 
     });
     const [audioPermission, setAudioPermission] = useState<boolean>(false);
     const audioContextRef = useRef<AudioContext | null>(null);
+    const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setTime(prevTime => {
-                const newDate = new Date(date);
-                newDate.setSeconds(newDate.getSeconds() + 1);
-                setDate(newDate);
-                return formatTime(newDate.toISOString());
-            });
-        }, 1000);
+        let animationFrameId: number;
 
-        return () => clearInterval(timer);
-    }, [date]);
+        const updateTime = () => {
+            const now = Date.now();
+            const elapsed = now - lastUpdateTime;
+
+            if (elapsed >= 1000) {
+                setTime(prevTime => {
+                    const newDate = new Date(date);
+                    newDate.setMilliseconds(newDate.getMilliseconds() + elapsed);
+                    setDate(newDate);
+                    setLastUpdateTime(now);
+                    return formatTime(newDate.toISOString());
+                });
+            }
+
+            animationFrameId = requestAnimationFrame(updateTime);
+        };
+
+        animationFrameId = requestAnimationFrame(updateTime);
+
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                // 탭이 다시 활성화되면 서버 시간을 다시 동기화
+                fetchServerTime(url).then(result => {
+                    const newTime = result[url];
+                    setDate(new Date(newTime));
+                    setTime(formatTime(newTime));
+                    setLastUpdateTime(Date.now());
+                });
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [url, date, lastUpdateTime]);
 
     const initAudioContext = () => {
         if (!audioContextRef.current) {
@@ -90,10 +122,10 @@ function ServerTime({ url, initialTime }: { url: string; initialTime: string }) 
         oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime);
         gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
         gainNode.gain.linearRampToValueAtTime(1, audioContextRef.current.currentTime + 0.01);
-        gainNode.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 0.5);
+        gainNode.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 3);
 
         oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 0.5);
+        oscillator.stop(audioContextRef.current.currentTime + 3);
     };
 
     const sendNotification = (minutes: number) => {
@@ -119,10 +151,10 @@ function ServerTime({ url, initialTime }: { url: string; initialTime: string }) 
         oscillator.frequency.setValueAtTime(440, audioContextRef.current.currentTime);
         gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
         gainNode.gain.linearRampToValueAtTime(1, audioContextRef.current.currentTime + 0.01);
-        gainNode.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 2);
+        gainNode.gain.linearRampToValueAtTime(0, audioContextRef.current.currentTime + 3);
 
         oscillator.start(audioContextRef.current.currentTime);
-        oscillator.stop(audioContextRef.current.currentTime + 2);
+        oscillator.stop(audioContextRef.current.currentTime + 3);
     };
 
     useEffect(() => {
@@ -201,6 +233,8 @@ export default function ServerTimeDisplay() {
         },
         refetchInterval: 20000,
         enabled: urls.length > 0,
+        gcTime: 0,
+        staleTime: 0,
     });
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -219,7 +253,7 @@ export default function ServerTimeDisplay() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-4 bg-gray-900 min-h-screen">
+        <div className="max-w-4xl mx-auto px-4 py-20 bg-gray-900 min-h-screen flex flex-col rounded gap-10">
             <h2 className="text-3xl font-bold mb-6 text-center text-gray-100">서버 시간 알림</h2>
             <form onSubmit={handleSubmit} className="mb-8">
                 <div className="flex">
@@ -243,6 +277,23 @@ export default function ServerTimeDisplay() {
             {data && Object.entries(data).map(([url, time]) => (
                 <ServerTime key={url} url={url} initialTime={time as string} />
             ))}
+            <div className='flex flex-col w-full justify-center mt-24'>
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-8 p-4 bg-gray-600 rounded-lg text-center"
+                >
+                    <p className="text-yellow-300 text-lg font-medium">
+                        여러분의 지원이 더 나은 서비스로 이어집니다!
+                    </p>
+                    <p className="text-gray-300 mt-2">
+                        광고를 클릭해 주시면 저희에게 큰 힘이 됩니다.
+                        여러분의 작은 관심이 더 정확한 운세와 새로운 기능 개발의 원동력이 됩니다.
+                    </p>
+                </motion.div>
+                <DisplayLudgi />
+            </div>
         </div>
     );
 }
